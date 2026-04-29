@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InPost Andon | System Produkcyjny</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
+    <!-- Podłączenie zewnętrznego pliku z pracownikami -->
+    <script src="workers.js"></script>
+
+    <style>
+        :root {
+            --col-yellow: #FFCC00; 
+            --col-bg: #121212; 
+            --col-card: #1E1E1E; 
+            --col-text: #FFFFFF;
+            --col-muted: #9E9E9E;
+            --border-color: #2A2A2A;
+            --input-bg: rgba(0,0,0,0.2);
+            
+            --status-ok: #2E7D32; 
+            --status-nok: #D32F2F; 
+            --status-warn: #F57C00; 
+            --teams-col: #5b5fc7;
+            
+            --ease-smooth: cubic-bezier(0.25, 0.8, 0.25, 1);
+            --shadow-soft: 0 8px 24px rgba(0,0,0,0.2);
+            --shadow-hover: 0 12px 32px rgba(0,0,0,0.4);
+        }
+
+        /* --- MOTYW JASNY --- */
+        [data-theme="light"] {
+            --col-bg: #F0F2F5; 
+            --col-card: #FFFFFF; 
+            --col-text: #121212;
+            --col-muted: #666666;
+            --border-color: #E0E0E0;
+            --input-bg: #F9F9F9;
+        }
+
+        * { box-sizing: border-box; user-select: none; }
+        body { margin: 0; font-family: 'Montserrat', sans-serif; background-color: var(--col-bg); color: var(--col-text); min-height: 100vh; overflow-x: hidden; -webkit-font-smoothing: antialiased; transition: background-color 0.3s, color 0.3s; }
+        .hidden { display: none !important; }
+
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* --- EKRAN LOGOWANIA --- */
+        #view-login { position: fixed; inset: 0; z-index: 999; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(18,18,18,0.98) 0%, rgba(10,10,10,0.95) 100%); padding: 1rem; animation: fadeIn 0.5s ease-out; }
+        .login-panel { width: 100%; max-width: 440px; padding: clamp(2rem, 5vw, 3rem) clamp(1.5rem, 5vw, 2.5rem); background: var(--col-card); border-radius: 16px; border-top: 4px solid var(--col-yellow); box-shadow: var(--shadow-soft); text-align: center; animation: fadeInUp 0.6s var(--ease-smooth); transition: background-color 0.3s; }
+        .login-panel h1 { font-weight: 900; font-size: 2.2rem; color: var(--col-yellow); margin: 0 0 0.5rem 0; letter-spacing: -1px; }
+        .login-panel p { color: var(--col-muted); font-size: 0.9rem; margin-bottom: 2.5rem; font-weight: 500; }
+        .input-group { margin-bottom: 1.5rem; text-align: left; }
+        .input-group label { display: block; font-size: 0.8rem; font-weight: 700; color: var(--col-muted); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px; }
+        .inp-login, .inp-select { width: 100%; padding: 1.2rem; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--col-text); font-family: inherit; font-size: 1rem; font-weight: 500; border-radius: 8px; transition: all 0.3s var(--ease-smooth); }
+        .inp-select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%239E9E9E%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 1rem top 50%; background-size: 0.65rem auto; }
+        .inp-select option { background: var(--col-bg); color: var(--col-text); }
+        .inp-login:focus, .inp-select:focus { border-color: var(--col-yellow); outline: none; box-shadow: 0 0 0 3px rgba(255,204,0,0.1); }
+        .inp-login::placeholder { color: var(--col-muted); }
+        .scanner-info { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 2rem; color: var(--col-muted); font-size: 0.85rem; }
+        .scanner-info i { color: var(--col-yellow); }
+
+        /* --- TV DASHBOARD --- */
+        #view-tv { display: flex; flex-direction: row; min-height: 100vh; animation: fadeIn 0.4s ease-out; position: relative; }
+        .tv-sidebar { width: 350px; background: var(--col-card); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; padding: 2rem 1.5rem; flex-shrink: 0; }
+        .tv-main { flex: 1; display: flex; flex-direction: column; padding: clamp(1rem, 3vw, 2.5rem); min-width: 0; }
+
+        .log-header { font-weight: 700; font-size: 1rem; color: var(--col-muted); margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; letter-spacing: 1px; }
+        .log-feed { flex: 1; overflow-y: auto; font-size: 0.85rem; }
+        .log-item { margin-bottom: 12px; padding-left: 12px; border-left: 3px solid #444; transition: 0.3s; }
+        .log-item.alert { border-left-color: var(--status-nok); background: rgba(211,47,47,0.1); padding: 8px 12px; border-radius: 0 6px 6px 0; }
+        .log-time { color: var(--col-yellow); font-weight: 700; margin-right: 8px; }
+        .log-detail { display: block; color: var(--col-muted); font-size: 0.75rem; margin-top: 4px; font-weight: 500; }
+
+        .tv-top-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 1.5rem; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); position: relative;}
+        .title-main { font-weight: 900; font-size: clamp(2rem, 4vw, 2.8rem); color: var(--col-text); line-height: 1; letter-spacing: -1px; display: flex; align-items: center; gap: 15px;}
+        .title-sub { font-weight: 700; color: var(--col-yellow); font-size: clamp(1rem, 2vw, 1.5rem); letter-spacing: 2px; text-transform: uppercase; }
+
+        .kpi-wrapper { display: flex; flex-wrap: wrap; gap: clamp(1rem, 3vw, 4rem); }
+        .kpi-unit { text-align: left; }
+        @media (min-width: 768px) { .kpi-unit { text-align: right; } }
+        .kpi-lbl { font-size: clamp(0.7rem, 1vw, 0.75rem); color: var(--col-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 1px; margin-bottom: 8px; }
+        .kpi-val { font-size: clamp(2rem, 3.5vw, 2.8rem); font-weight: 800; color: var(--col-text); line-height: 1; font-variant-numeric: tabular-nums; }
+        .kpi-val.yellow { color: var(--col-yellow); }
+
+        .tv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem; flex: 1; align-content: start; }
+        .tv-card { background: var(--col-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: all 0.3s var(--ease-smooth); min-height: 150px; animation: fadeInUp 0.5s both; }
+        .tv-card:nth-child(1) { animation-delay: 0.1s; } .tv-card:nth-child(2) { animation-delay: 0.15s; } .tv-card:nth-child(3) { animation-delay: 0.2s; } .tv-card:nth-child(4) { animation-delay: 0.25s; }
+        .tv-card-head { font-size: clamp(2rem, 4vw, 3rem); font-weight: 900; color: var(--col-text); line-height: 1; letter-spacing: -1px;}
+        .tv-card-sub { font-size: 0.75rem; font-weight: 700; color: var(--col-muted); text-transform: uppercase; margin-top: 12px; letter-spacing: 1px; padding: 6px 16px; border-radius: 50px; text-align: center;}
+        
+        .st-ok { border-bottom: 4px solid var(--status-ok); } .st-ok .tv-card-sub { background: rgba(46,125,50,0.15); color: var(--status-ok); }
+        .st-warn { border-bottom: 4px solid var(--col-yellow); } .st-warn .tv-card-sub { background: rgba(255,204,0,0.15); color: #B28F00; } .st-warn .tv-card-head { color: var(--col-yellow); }
+        .st-err { border-bottom: 4px solid var(--status-nok); background: rgba(211,47,47,0.05); } .st-err .tv-card-head { color: var(--status-nok); } .st-err .tv-card-sub { background: var(--status-nok); color: white; }
+
+        .b7-wrapper { margin-top: 2rem; background: var(--col-card); border: 1px solid var(--border-color); border-left: 6px solid #444; border-radius: 12px; display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; padding: clamp(1rem, 3vw, 2rem); transition: 0.3s; }
+
+        /* --- NAKŁADKA PRZERWY --- */
+        #tv-break-overlay { position: absolute; inset: 0; z-index: 1500; background: rgba(18, 18, 18, 0.95); backdrop-filter: blur(12px); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; animation: fadeIn 0.5s ease-out; }
+        #tv-break-overlay i { font-size: clamp(4rem, 8vw, 6rem); color: var(--col-yellow); margin-bottom: 1rem; }
+        #tv-break-overlay h1 { font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 900; color: white; letter-spacing: -1px; margin: 0; }
+        #tv-break-overlay p { font-size: clamp(1rem, 2vw, 1.5rem); color: #9E9E9E; margin: 1rem 0 2rem 0; font-weight: 500; }
+        #break-timer { font-size: clamp(4rem, 10vw, 8rem); font-weight: 900; color: var(--col-yellow); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -2px; }
+
+        .btn-settings { background: var(--input-bg); border: 1px solid var(--border-color); color: var(--col-text); padding: 10px; border-radius: 8px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .btn-settings:hover { background: var(--col-yellow); color: black; border-color: var(--col-yellow); }
+
+        /* --- OPERATOR PANEL --- */
+        #view-op { display: flex; flex-direction: column; min-height: 100vh; padding: clamp(1rem, 3vw, 2rem) clamp(1rem, 4vw, 3rem); animation: fadeIn 0.4s ease-out;}
+        .op-header { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: flex-end; margin-bottom: 2.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1.5rem; }
+        .op-title { font-size: clamp(2rem, 5vw, 3rem); font-weight: 900; color: var(--col-text); line-height: 1; letter-spacing: -1px;}
+        
+        .op-info { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+        .op-user-name { font-size: clamp(0.9rem, 2vw, 1.1rem); font-weight: 700; color: var(--col-yellow); display: block; }
+        .op-logout { font-size: 0.8rem; color: var(--col-muted); cursor: pointer; text-decoration: none; transition: 0.2s; font-weight: 500; display: flex; align-items: center; gap: 5px; }
+        .op-logout:hover { color: var(--col-text); }
+
+        .op-body { flex: 1; display: grid; grid-template-rows: auto 1fr; gap: 2rem; }
+        
+        .met-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: clamp(1rem, 2vw, 2rem); }
+        .met-tile { background: var(--col-card); padding: clamp(1.2rem, 2vw, 2rem); border-radius: 12px; border: 1px solid var(--border-color); animation: fadeInUp 0.4s both; }
+        .met-lbl { font-size: clamp(0.6rem, 1vw, 0.75rem); color: var(--col-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px;}
+        .met-val { font-size: clamp(2rem, 4vw, 3.2rem); font-weight: 800; color: var(--col-text); margin-top: 8px; line-height: 1; font-variant-numeric: tabular-nums;}
+
+        /* NOWY GRID DLA 3 PRZYCISKÓW (Zamiast 4) */
+        .act-grid { 
+            display: grid; 
+            grid-template-columns: 2fr 1fr; 
+            grid-template-rows: 1fr 1fr; 
+            gap: clamp(1rem, 2vw, 2rem); 
+            height: 100%; min-height: 400px; 
+            animation: fadeInUp 0.6s both; 
+        }
+        .btn-big-ok { 
+            grid-column: 1; 
+            grid-row: 1 / 3; 
+            background: var(--col-yellow); color: #111; 
+            font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 900; 
+            box-shadow: var(--shadow-soft); letter-spacing: -1px; 
+        }
+        .btn-help { 
+            grid-column: 2; grid-row: 1; 
+            background: var(--col-card); border: 1px solid var(--border-color); 
+            color: var(--col-text); font-size: clamp(1rem, 2vw, 1.3rem); 
+        }
+        .btn-doc { 
+            grid-column: 2; grid-row: 2; 
+            background: var(--col-card); border: 1px solid var(--border-color); 
+            color: var(--col-text); font-size: clamp(0.9rem, 1.5vw, 1.1rem); 
+        }
+
+        .btn-ind { border: none; border-radius: 16px; font-family: inherit; font-weight: 700; text-transform: uppercase; cursor: pointer; transition: all 0.3s var(--ease-smooth); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; padding: 1.5rem; text-align: center;}
+        .btn-ind i { font-size: clamp(2rem, 3vw, 2.5rem); margin-bottom: 12px; }
+        .btn-sub { font-size: clamp(0.7rem, 1vw, 0.9rem); font-weight: 500; opacity: 0.8; margin-top: 8px; text-transform: none; }
+        
+        .btn-big-ok:hover:not(:disabled) { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
+        .btn-big-ok:active:not(:disabled) { transform: translateY(0); }
+        .btn-big-ok:disabled { background: var(--border-color); color: var(--col-muted); box-shadow: none; cursor: not-allowed; }
+        
+        .btn-doc:hover { border-color: var(--col-yellow); color: var(--col-yellow); }
+        
+        .btn-help:hover { background: var(--border-color); }
+        .btn-help.active { background: var(--status-warn); color: white; border-color: var(--status-warn); }
+
+        /* --- MODALS --- */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); z-index: 2000; display: flex; justify-content: center; align-items: center; padding: 1rem; overflow-y: auto; opacity: 0; transition: opacity 0.3s ease; pointer-events: none;}
+        .modal-overlay.show { opacity: 1; pointer-events: auto; }
+        .modal-box { background: var(--col-card); width: 100%; max-width: 600px; padding: clamp(1.5rem, 4vw, 3rem); border-radius: 16px; border: 1px solid var(--border-color); box-shadow: var(--shadow-hover); margin: auto; transform: translateY(20px); transition: transform 0.3s var(--ease-smooth); }
+        .modal-overlay.show .modal-box { transform: translateY(0); }
+        .modal-head { font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 800; color: var(--col-text); margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
+        
+        .reason-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
+        .btn-reason { padding: 1rem; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--col-text); font-family: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer; border-radius: 8px; transition: 0.2s; text-align: left; display: flex; align-items: center; gap: 10px; }
+        .btn-reason:hover { background: var(--col-bg); border-color: var(--col-yellow); color: var(--col-yellow); transform: translateY(-2px); }
+        
+        .btn-action { width: 100%; padding: 1rem; background: var(--border-color); color: var(--col-text); font-family: inherit; font-weight: 700; font-size: 0.95rem; border: none; border-radius: 8px; cursor: pointer; transition: 0.2s; margin-top: 1.5rem; text-transform: uppercase; }
+        .btn-action:hover { opacity: 0.8; }
+        .btn-action.primary { background: var(--col-yellow); color: #000; border: none;}
+        .btn-action.primary:hover { background: #E6B800; }
+        .btn-action.danger { background: var(--status-nok); color: white; border: none;}
+        .btn-action.danger:hover { background: #C62828; }
+        
+        .inp-textarea, .inp-text { width: 100%; padding: 1rem; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--col-text); font-family: inherit; font-size: 0.95rem; border-radius: 8px; transition: 0.2s; }
+        .inp-textarea { resize: none; height: 100px; }
+        .inp-textarea:focus, .inp-text:focus { outline: none; border-color: var(--col-yellow); }
+
+        /* --- TEAMS TOAST --- */
+        #teams-toast { position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); background: #2b2b36; border: 1px solid var(--teams-col); padding: 1rem 1.5rem; border-radius: 8px; z-index: 3000; display: flex; align-items: center; gap: 15px; width: max-content; max-width: 90vw; box-shadow: 0 10px 30px rgba(91, 95, 199, 0.3); transition: bottom 0.5s var(--ease-smooth); }
+        #teams-toast.show { bottom: 30px; }
+        #teams-toast i { color: #8A8EF0; font-size: 1.5rem; }
+        #teams-toast .tt-text { font-weight: 700; color: white; font-size: 0.9rem;}
+        #teams-toast .tt-sub { font-size: 0.75rem; color: #B0B0B0; font-weight: 500; }
+
+        @media (max-width: 1200px) { #view-tv { flex-direction: column; } .tv-sidebar { width: 100%; border-right: none; border-top: 1px solid var(--border-color); max-height: 350px; } }
+        @media (max-width: 900px) { 
+            .act-grid { grid-template-columns: 1fr; grid-template-rows: auto; } 
+            .btn-big-ok, .btn-help, .btn-doc { grid-column: auto; grid-row: auto; }
+            .btn-big-ok { min-height: 180px; } 
+            .btn-help, .btn-doc { min-height: 100px; } 
+        }
+        @media (max-width: 600px) { .tv-top-bar { flex-direction: column; align-items: flex-start; } .kpi-wrapper { flex-direction: column; width: 100%; gap: 1rem;} .b7-wrapper { flex-direction: column; align-items: flex-start; } #teams-toast { flex-direction: column; text-align: center; } .op-header { flex-direction: column; align-items: flex-start;} .op-info { align-items: flex-start; } .met-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+    <script>
+        const savedTheme = localStorage.getItem('andon_theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+
+    <!-- TEAMS TOAST -->
+    <div id="teams-toast">
+        <i class="material-icons">notifications_active</i>
+        <div>
+            <div class="tt-text">Zgłoszenie wysłane</div>
+            <div class="tt-sub">Wiadomość dostarczona na kanał MS Teams</div>
+        </div>
+    </div>
+
+    <!-- EKRAN LOGOWANIA -->
+    <div id="view-login">
+        <div class="login-panel">
+            <h1>Andon System</h1>
+            <p>Logowanie pracownika</p>
+            
+            <div class="input-group">
+                <label>Wybierz stanowisko</label>
+                <select id="station-select" class="inp-select">
+                    <option value="x1">Stanowisko X1</option>
+                    <option value="x2">Stanowisko X2</option>
+                    <option value="x3">Stanowisko X3</option>
+                    <option value="x4">Stanowisko X4</option>
+                    <option value="x5">Stanowisko X5</option>
+                    <option value="x6">Stanowisko X6</option>
+                    <option value="x7">Stanowisko X7</option>
+                    <option value="b7">Stanowisko B7 (Niezależne)</option>
+                    <option value="admin">Panel Brygadzisty</option>
+                    <option value="tv">Główny Dashboard (TV)</option>
+                </select>
+            </div>
+
+            <div class="input-group" style="margin-top: 1.5rem;">
+                <label>Identyfikator</label>
+                <input type="password" id="badge-scan" class="inp-login" placeholder="Zbliż kartę do czytnika..." autofocus autocomplete="off">
+            </div>
+            
+            <div id="l-msg" style="color:var(--status-nok); margin-top:10px; font-weight:600; font-size:0.85rem; min-height:20px;"></div>
+
+            <div class="scanner-info">
+                <i class="material-icons">qr_code_scanner</i>
+                <span>Skaner nasłuchuje kodów kreskowych/RFID</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- TV DASHBOARD -->
+    <div id="view-tv" class="hidden">
+        <div id="tv-break-overlay" class="hidden">
+            <i class="material-icons" id="overlay-icon">coffee</i>
+            <h1 id="overlay-title">PRZERWA</h1>
+            <p>Czas taktu na stanowiskach został wstrzymany.</p>
+            <div id="break-timer">05:00</div>
+        </div>
+
+        <div class="tv-main">
+            <div class="tv-top-bar">
+                <div class="title-main">
+                    DASHBOARD
+                    <button class="btn-settings" onclick="modals.open('admin')" title="Ustawienia Linii">
+                        <i class="material-icons">settings</i>
+                    </button>
+                </div>
+                
+                <div class="kpi-wrapper">
+                    <div class="kpi-unit">
+                        <div class="kpi-lbl">Status Linii</div>
+                        <div class="kpi-val" id="tv-status" style="color:var(--status-ok)">PRACA</div>
+                    </div>
+                    <div class="kpi-unit">
+                        <div class="kpi-lbl">Czas Taktu</div>
+                        <div class="kpi-val yellow" id="tv-takt">28:00</div>
+                    </div>
+                    <div class="kpi-unit">
+                        <div class="kpi-lbl" id="tv-goal-lbl">Realizacja (Cel: 15)</div>
+                        <div class="kpi-val" id="tv-count">0/15</div>
+                    </div>
+                </div>
+                
+                <div class="kpi-unit">
+                    <div class="kpi-lbl">Zegar systemowy</div>
+                    <div class="kpi-val" style="color: var(--col-muted);" id="sys-clock">12:00</div>
+                </div>
+            </div>
+
+            <div class="tv-grid" id="tv-grid"></div>
+
+            <div class="b7-wrapper">
+                <div style="font-size:clamp(1.5rem, 2vw, 2rem); font-weight: 800; color: var(--col-text);">STANOWISKO B7</div>
+                <div id="b7-status" style="font-size:clamp(0.9rem, 1vw, 1.1rem); font-weight:700; color:var(--col-muted); text-transform: uppercase;">Zalogowany</div>
+            </div>
+        </div>
+
+        <div class="tv-sidebar">
+            <div class="log-header">
+                <span>Dziennik Zdarzeń</span>
+                <i class="material-icons" style="font-size: 1.2rem;">history</i>
+            </div>
+            <div class="log-feed" id="tv-logs"></div>
+        </div>
+    </div>
+
+    <!-- OPERATOR PANEL -->
+    <div id="view-op" class="hidden">
+        <div class="op-header">
+            <div>
+                <div class="op-title" id="op-title">X1</div>
+            </div>
+            <div class="op-info">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                    <span class="op-user-name" id="op-user-name">Jan Kowalski</span>
+                    <i class="material-icons" style="color: var(--col-muted); cursor: pointer; font-size: 1.2rem; transition: 0.2s;" onclick="modals.open('op-settings')" title="Ustawienia Operatora" onmouseover="this.style.color='var(--col-text)'" onmouseout="this.style.color='var(--col-muted)'">settings</i>
+                </div>
+                <div class="op-logout" onclick="location.reload()"><i class="material-icons" style="font-size: 1rem; vertical-align: text-bottom;">logout</i> Wyloguj i zmień konto</div>
+            </div>
+        </div>
+
+        <div class="op-body">
+            <div class="met-grid">
+                <div class="met-tile" style="border-left-color: var(--status-ok);">
+                    <div class="met-lbl">Czas Taktu</div>
+                    <div class="met-val" id="op-takt">28:00</div>
+                </div>
+                <div class="met-tile" style="border-left-color: var(--status-nok)">
+                    <div class="met-lbl">Czas Przestoju</div>
+                    <div class="met-val" id="op-down" style="color: var(--status-nok)">00:00</div>
+                </div>
+                <div class="met-tile" style="border-left-color: var(--col-yellow)">
+                    <div class="met-lbl" id="op-goal-lbl">Wykonano (Cel: 15)</div>
+                    <div class="met-val" id="op-count">0/15</div>
+                </div>
+            </div>
+
+            <div class="act-grid">
+                <button class="btn-ind btn-big-ok" id="btn-ok" onclick="Logic.actionOK()">
+                    POTWIERDŹ OK
+                    <div class="btn-sub">Zakończ cykl jako prawidłowy</div>
+                </button>
+                <button class="btn-ind btn-help" id="btn-help" onclick="Logic.handleSupportClick()">
+                    <i class="material-icons">support_agent</i> Wezwij Wsparcie
+                </button>
+                <button class="btn-ind btn-doc" onclick="modals.open('doc')">
+                    <i class="material-icons">description</i> Instrukcja (SOP)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: USTAWIENIA OPERATORA -->
+    <div id="modal-op-settings" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-head" style="color: var(--col-yellow);">Ustawienia Wyglądu</div>
+            <p style="color: var(--col-muted); font-size: 0.9rem; margin-bottom: 20px;">Dostosuj aplikację do swoich preferencji.</p>
+            <div class="input-group">
+                <label>Motyw aplikacji</label>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-action" style="margin-top: 0; background: var(--input-bg); color: var(--col-text); border: 1px solid var(--border-color);" onclick="setTheme('dark')">
+                        <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">dark_mode</i> Ciemny
+                    </button>
+                    <button class="btn-action" style="margin-top: 0; background: var(--input-bg); color: var(--col-text); border: 1px solid var(--border-color);" onclick="setTheme('light')">
+                        <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">light_mode</i> Jasny
+                    </button>
+                </div>
+            </div>
+            <button class="btn-action primary" onclick="modals.close('op-settings')">Zapisz i Zamknij</button>
+        </div>
+    </div>
+
+    <!-- MODAL: USTAWIENIA ADMINA (BRYGADZISTA) -->
+    <div id="modal-admin" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-head" style="color: var(--col-yellow);">Zarządzanie Linią</div>
+            <p style="color: var(--col-muted); font-size: 0.9rem; margin-bottom: 20px;">Czas taktu zostanie automatycznie obliczony na podstawie celu na zmianę (uwzględniając 45 min przerw).</p>
+            <div class="input-group">
+                <label>Dzienny cel produkcyjny (ilość maszyn)</label>
+                <input type="number" id="admin-goal-input" class="inp-text" value="15" min="1" max="100">
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn-action primary" style="margin-top:0;" onclick="Logic.saveAdminSettings()">Przelicz i Zapisz</button>
+                <button class="btn-action" style="background: transparent; border: 1px solid var(--border-color); color: var(--col-text); margin-top:0;" onclick="modals.close('admin')">Anuluj</button>
+            </div>
+        </div>
+    </div>
+
+<!-- MODAL: WSPARCIE Z KOMENTARZEM -->
+    <div id="modal-support" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-head">Potrzebuję wsparcia z powodu:</div>
+            
+            <div class="reason-grid">
+                <!-- Zmiana tutaj: wywołuje funkcję pokazującą pole tekstowe -->
+                <button class="btn-reason" onclick="Logic.showMaterialComment()"><i class="material-icons" style="color:var(--col-yellow)">inventory_2</i> Brak Materiału</button>
+                <button class="btn-reason" onclick="Logic.callSupport('Awaria Maszyny')"><i class="material-icons" style="color:var(--status-nok)">build</i> Awaria Maszyny</button>
+                <button class="btn-reason" onclick="Logic.callSupport('Zgłoszenie NOK (Brak)')"><i class="material-icons" style="color:var(--status-nok)">report</i> Zgłoszenie NOK (Brak)</button>
+                <button class="btn-reason" onclick="Logic.callSupport('Inne / Lider')"><i class="material-icons" style="color:var(--col-muted)">contact_support</i> Inne / Potrzebny Lider</button>
+            </div>
+
+            <!-- Kontener na komentarz (domyślnie ukryty) -->
+            <div id="support-comment-container" class="hidden" style="margin-top: 20px;">
+                <label style="display: block; color: var(--col-yellow); margin-bottom: 8px; font-size: 0.9rem; font-weight: bold;">Opisz, jakiego materiału brakuje:</label>
+                <textarea id="support-comment" class="inp-textarea" placeholder="Wpisz komentarz (np. jakiej części brakuje)..."></textarea>
+                <button id="btn-send-material-support" class="btn-action primary" onclick="Logic.callSupport('Brak Materiału', true)">Wyślij Zgłoszenie o Braku Materiału</button>
+            </div>
+
+            <button class="btn-action" style="background: transparent; border: 1px solid var(--border-color); color: var(--col-text); margin-top: 1.5rem;" onclick="Logic.closeSupportModal()">Zamknij</button>
+        </div>
+    </div>
+
+    <!-- MODAL: DOKUMENTACJA -->
+    <div id="modal-doc" class="modal-overlay">
+        <div class="modal-box" style="max-width: 800px;">
+            <div class="modal-head">Instrukcja S.O.P.</div>
+            <div style="color: var(--col-muted); font-size: 0.95rem; line-height: 1.6;">
+                <div style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border-color);">
+                    <strong style="color: var(--col-yellow); display: block; margin-bottom: 8px;">KROK 1: WERYFIKACJA WIZUALNA</strong> Sprawdź komponenty z dokumentacją BOM.
+                </div>
+                <div>
+                    <strong style="color: var(--col-yellow); display: block; margin-bottom: 8px;">KROK 2: MONTAŻ WŁAŚCIWY</strong> Zamontuj element zgodnie ze schematem.
+                </div>
+            </div>
+            <button class="btn-action primary" onclick="modals.close('doc')">Zrozumiałem</button>
+        </div>
+    </div>
+
+    <script>
+        function setTheme(themeName) {
+            document.documentElement.setAttribute('data-theme', themeName);
+            localStorage.setItem('andon_theme', themeName);
+        }
+
+        document.getElementById('badge-scan').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); Auth.login(); }
+        });
+
+function sendTeamsNotification(title, message) {
+            // 1. Pokazanie powiadomienia Toast w aplikacji
+            const toast = document.getElementById('teams-toast');
+            toast.classList.add('show'); 
+            setTimeout(() => toast.classList.remove('show'), 4000);
+
+            // 2. TUTAJ WKLEJ SKOPIOWANY LINK Z DISCORDA
+            const webhookUrl = "https://discord.com/api/webhooks/1499094596167143454/cPjKtQK8em6Ew2kSWIi_yeqqwrKftEVn7nU9NKTKUGQfYClHGdoDcMZeXhHO-wrairOT"; 
+            
+            // 3. Sformatowanie wiadomości pod Discorda (Embed)
+            const payload = {
+                username: "Andon System", // Nazwa bota
+                embeds: [{
+                    title: title,
+                    description: message,
+                    color: 15158332 // Kod koloru czerwonego
+                }]
+            };
+
+            // 4. Wysłanie zgłoszenia
+            fetch(webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).catch(err => console.error("Błąd wysyłki na serwer:", err));
+        }
+
+        function checkBreak() {
+            const d = new Date();
+            const currentMins = d.getHours() * 60 + d.getMinutes();
+            const currentSecsTotal = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+
+            const schedule = [
+                { name: "ODPRAWA (ZMIANA 1)", start: 6*60, end: 6*60+5, icon: "groups" },
+                { name: "PRZERWA ŚNIADANIOWA", start: 8*60, end: 8*60+5, icon: "coffee" },
+                { name: "GŁÓWNA PRZERWA (Z1)", start: 10*60, end: 10*60+30, icon: "restaurant" },
+                { name: "PRZERWA (Z1)", start: 12*60+30, end: 12*60+35, icon: "coffee" },
+                { name: "ODPRAWA (ZMIANA 2)", start: 14*60+5, end: 14*60+10, icon: "groups" },
+                { name: "PRZERWA (Z2)", start: 16*60, end: 16*60+5, icon: "coffee" },
+                { name: "GŁÓWNA PRZERWA (Z2)", start: 18*60, end: 18*60+30, icon: "restaurant" },
+                { name: "PRZERWA (Z2)", start: 20*60+30, end: 20*60+35, icon: "coffee" }
+            ];
+
+            for(let ev of schedule) {
+                if(currentMins >= ev.start && currentMins < ev.end) {
+                    const endSecsTotal = ev.end * 60;
+                    return { active: true, name: ev.name, icon: ev.icon, left: endSecsTotal - currentSecsTotal };
+                }
+            }
+            return { active: false };
+        }
+
+        const CFG = { stations: ['x1','x2','x3','x4','x5','x6','x7'], indep: 'b7', netShiftMins: 435 };
+
+        const DB = {
+            get: () => JSON.parse(localStorage.getItem('inpost_andon_v18')) || DB.init(),
+            save: (d) => { localStorage.setItem('inpost_andon_v18', JSON.stringify(d)); window.dispatchEvent(new Event('storage')); },
+            init: () => {
+                const defaultGoal = 15;
+                const defaultTakt = Math.floor(CFG.netShiftMins / defaultGoal); 
+                const d = { goal: defaultGoal, taktMins: defaultTakt, count: 0, target: Date.now() + (defaultTakt * 60000), isDown: false, downStart: null, accDown: 0, st: {}, logs: [], isBreak: false, breakStart: null };
+                [...CFG.stations, CFG.indep].forEach(id => d.st[id] = {r: false, s: false, reason: null});
+                DB.save(d); return d;
+            },
+            log: (d, msg, detail='', type='info') => {
+                const t = new Date().toLocaleTimeString('pl-PL'); d.logs.unshift({t, m: msg, d: detail, type}); if(d.logs.length > 50) d.logs.pop();
+            }
+        };
+
+        let currentUser = null; let currentUserName = null;
+        const Auth = {
+            login: () => {
+                const station = document.getElementById('station-select').value;
+                const badgeId = document.getElementById('badge-scan').value.trim();
+                const err = document.getElementById('l-msg');
+                
+                if (typeof MOCK_WORKERS !== 'undefined' && MOCK_WORKERS[badgeId]) {
+                    currentUser = station; currentUserName = MOCK_WORKERS[badgeId];
+                    if (station === 'tv' || station === 'admin') { 
+                        document.getElementById('admin-goal-input').value = DB.get().goal;
+                        UI.switch('view-tv'); 
+                    } else {
+                        document.getElementById('op-title').innerText = station.toUpperCase();
+                        document.getElementById('op-user-name').innerText = currentUserName;
+                        UI.switch('view-op'); 
+                    }
+                } else { err.innerText = "Nieznany identyfikator. Zeskanuj kartę ponownie."; document.getElementById('badge-scan').value = ''; }
+            }
+        };
+
+const Logic = {
+            actionOK: () => {
+                let db = DB.get(); db.st[currentUser].r = true;
+                if(CFG.stations.includes(currentUser)) {
+                    if(CFG.stations.every(id => db.st[id].r)) {
+                        db.count++; db.target = Date.now() + (db.taktMins * 60000);
+                        if(db.isDown) { db.accDown += Math.floor((Date.now() - db.downStart)/1000); db.isDown = false; db.downStart = null; }
+                        CFG.stations.forEach(id => db.st[id].r = false);
+                        DB.log(db, `Cykl zamknięty (Wykonano: ${db.count}/${db.goal})`);
+                    }
+                } else { DB.log(db, `Stanowisko B7 zgłasza gotowość`); }
+                DB.save(db); Render.all();
+            },
+            handleSupportClick: () => {
+                let db = DB.get();
+                if (db.st[currentUser].s) {
+                    Logic.cancelSupport();
+                } else {
+                    // Resetowanie modala przed pokazaniem
+                    document.getElementById('support-comment-container').classList.add('hidden');
+                    document.getElementById('support-comment').value = '';
+                    modals.open('support');
+                }
+            },
+            // NOWA FUNKCJA: Pokazuje pole tekstowe dla "Brak Materiału"
+            showMaterialComment: () => {
+                document.getElementById('support-comment-container').classList.remove('hidden');
+            },
+            // ZMODYFIKOWANA FUNKCJA
+            callSupport: (reason, isMaterialShortage = false) => {
+                let comment = '';
+                if (isMaterialShortage) {
+                    comment = document.getElementById('support-comment').value.trim();
+                }
+
+                let db = DB.get(); const s = db.st[currentUser]; s.s = true; s.reason = reason;
+                
+                const detailMsg = comment ? `Powód: ${reason} | Komentarz: ${comment}` : `Powód: ${reason}`;
+                
+                DB.log(db, `Wezwanie: ${currentUser.toUpperCase()}`, `${detailMsg} (${currentUserName})`, 'alert');
+                sendTeamsNotification(
+                    `Alert: ${currentUser.toUpperCase()} (${reason})`, 
+                    `Pracownik **${currentUserName}** wysłał zgłoszenie.\n\n**Powód:** ${reason}\n**Komentarz:** ${comment || 'Brak komentarza'}`
+                );
+                
+                Logic.closeSupportModal(); 
+                DB.save(db); Render.all();
+            },
+            // Funkcja pomocnicza do zamykania modala i resetowania jego stanu
+            closeSupportModal: () => {
+                document.getElementById('support-comment').value = ''; 
+                document.getElementById('support-comment-container').classList.add('hidden');
+                modals.close('support');
+            },
+            cancelSupport: () => {
+                let db = DB.get(); const s = db.st[currentUser]; 
+                s.s = false; s.reason = null;
+                DB.log(db, `Anulowano wezwanie: ${currentUser.toUpperCase()}`, `Wsparcie nie jest już wymagane.`, 'info');
+                sendTeamsNotification(`Odwołanie Alertu: ${currentUser.toUpperCase()}`, `Pracownik **${currentUserName}** anulował wcześniejsze wezwanie wsparcia/zgłoszenie.`);
+                DB.save(db); Render.all();
+            },
+            saveAdminSettings: () => {
+                const newGoal = parseInt(document.getElementById('admin-goal-input').value);
+                if(newGoal > 0) {
+                    let db = DB.get();
+                    db.goal = newGoal;
+                    db.taktMins = Math.floor(CFG.netShiftMins / newGoal); 
+                    db.target = Date.now() + (db.taktMins * 60000); 
+                    db.isDown = false;
+                    DB.log(db, `Brygadzista zmienił cel na: ${newGoal} szt.`, `Nowy automatyczny takt: ${db.taktMins} min`, 'info');
+                    DB.save(db); modals.close('admin'); Render.all();
+                }
+            }
+        };
+
+        const Render = {
+            all: () => {
+                const db = DB.get(); const now = Date.now();
+                const bStat = checkBreak();
+                
+                if(bStat.active && !db.isBreak) {
+                    db.isBreak = true; db.breakStart = now; DB.save(db);
+                } else if (!bStat.active && db.isBreak) {
+                    db.isBreak = false; 
+                    const breakDuration = now - db.breakStart;
+                    db.target += breakDuration; 
+                    if(db.downStart) db.downStart += breakDuration; 
+                    DB.save(db);
+                }
+
+                let calcNow = db.isBreak ? db.breakStart : now; 
+                let tSec = 0, dSec = db.accDown;
+
+                if(db.isDown) { if(db.downStart) dSec += Math.floor((calcNow - db.downStart)/1000); } 
+                else {
+                    let diff = Math.floor((db.target - calcNow)/1000);
+                    if(diff >= 0) tSec = diff;
+                    else { db.isDown = true; db.downStart = calcNow; DB.log(db, "Czas taktu przekroczony!", '', 'alert'); DB.save(db); }
+                }
+
+                if(!document.getElementById('view-tv').classList.contains('hidden')) Render.tv(db, tSec, bStat);
+                if(!document.getElementById('view-op').classList.contains('hidden')) Render.op(db, tSec, dSec);
+            },
+            tv: (db, tSec, bStat) => {
+                document.getElementById('sys-clock').innerText = new Date().toLocaleTimeString('pl-PL', {hour: '2-digit', minute:'2-digit'});
+                document.getElementById('tv-takt').innerText = fmt(tSec);
+                document.getElementById('tv-goal-lbl').innerText = `Realizacja (Cel: ${db.goal})`;
+                document.getElementById('tv-count').innerText = `${db.count}/${db.goal}`;
+                
+                const overlay = document.getElementById('tv-break-overlay');
+                if(bStat.active && currentUser === 'tv') {
+                    overlay.classList.remove('hidden');
+                    document.getElementById('overlay-title').innerText = bStat.name;
+                    document.getElementById('overlay-icon').innerText = bStat.icon;
+                    document.getElementById('break-timer').innerText = fmt(bStat.left);
+                } else {
+                    overlay.classList.add('hidden');
+                }
+
+                const st = document.getElementById('tv-status');
+                if(db.isDown) { st.innerText = "PRZESTÓJ"; st.style.color = "var(--status-nok)"; }
+                else { st.innerText = "PRACA"; st.style.color = "var(--status-ok)"; }
+
+                const g = document.getElementById('tv-grid'); 
+                if(g.children.length === 0) g.innerHTML = CFG.stations.map(id => `<div class="tv-card" id="card-${id}"><div class="tv-card-head">${id.toUpperCase()}</div><div class="tv-card-sub" id="sub-${id}">W TOKU</div></div>`).join('');
+                
+                CFG.stations.forEach(id => {
+                    const s = db.st[id]; const card = document.getElementById(`card-${id}`); const sub = document.getElementById(`sub-${id}`);
+                    card.className = 'tv-card'; 
+                    if(s.s) { card.classList.add('st-warn'); sub.innerText = s.reason || 'WSPARCIE'; } 
+                    else if(db.isDown && !s.r) { card.classList.add('st-err'); sub.innerText = 'OPÓŹNIENIE'; }
+                    else if(s.r) { card.classList.add('st-ok'); sub.innerText = 'ZROBIONE'; }
+                    else { sub.innerText = 'W TOKU'; }
+                });
+
+                const b7 = db.st[CFG.indep]; const bw = document.querySelector('.b7-wrapper');
+                bw.style.borderLeftColor = b7.s ? "var(--col-yellow)" : "var(--border-color)";
+                document.getElementById('b7-status').innerText = b7.s ? (b7.reason || 'WSPARCIE') : 'PRACA W TOKU';
+
+                const newLogsHTML = db.logs.map(l => `<div class="log-item ${l.type === 'alert' ? 'alert' : ''}"><span class="log-time">${l.t}</span> <span style="color: var(--col-text); font-weight: 600;">${l.m}</span>${l.d ? `<span class="log-detail">${l.d}</span>` : ''}</div>`).join('');
+                const logContainer = document.getElementById('tv-logs');
+                if (logContainer.innerHTML !== newLogsHTML) { logContainer.innerHTML = newLogsHTML; }
+            },
+            op: (db, tSec, dSec) => {
+                document.getElementById('op-takt').innerText = fmt(tSec);
+                document.getElementById('op-down').innerText = fmt(dSec);
+                document.getElementById('op-goal-lbl').innerText = `Wykonano (Cel: ${db.goal})`;
+                document.getElementById('op-count').innerText = `${db.count}/${db.goal}`;
+                
+                const s = db.st[currentUser];
+                const bOk = document.getElementById('btn-ok'); const bSup = document.getElementById('btn-help');
+                
+                if(db.isBreak) {
+                    bOk.innerHTML = `PRZERWA<div class='btn-sub'>Odpocznij, czas jest zatrzymany</div>`; bOk.disabled = true;
+                } else if(s.r) { 
+                    bOk.innerHTML = `OCZEKIWANIE...<div class='btn-sub'>Czekamy na zamknięcie cyklu na linii</div>`; bOk.disabled = true; 
+                } else { 
+                    bOk.innerHTML = `POTWIERDŹ OK<div class='btn-sub'>Zakończ cykl jako prawidłowy</div>`; bOk.disabled = false; 
+                }
+
+                if(s.s) { bSup.classList.add('active'); bSup.innerHTML = `<i class='material-icons'>close</i>Anuluj Wsparcie<div class='btn-sub'>Zgłoszono: ${s.reason}</div>`; } 
+                else { bSup.classList.remove('active'); bSup.innerHTML = `<i class='material-icons'>support_agent</i>Wezwij Wsparcie`; }
+            }
+        };
+
+        const UI = { switch: (id) => { document.querySelectorAll('body > div.hidden, body > div[id^="view-"]').forEach(d => d.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); Render.all(); } };
+        const modals = { open: (id) => { document.getElementById(`modal-${id}`).classList.add('show'); }, close: (id) => { document.getElementById(`modal-${id}`).classList.remove('show'); } };
+        function fmt(s) { return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
+
+        setInterval(() => { if(!document.getElementById('view-login').classList.contains('show') && document.getElementById('view-login').classList.contains('hidden')) Render.all(); }, 200);
+        window.addEventListener('storage', Render.all);
+    </script>
+</body>
+</html>
