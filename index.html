@@ -498,7 +498,7 @@ function sendTeamsNotification(title, message) {
             return { active: false };
         }
 
-        const CFG = { stations: ['x1','x2','x3','x4','x5','x6','x7'], indep: 'b7', netShiftMins: 435 };
+        const CFG = { stations: ['x1','x2','x3','x4','x5','x6','x7'], indep: 'b7', netShiftMins: 420 };
 
         const DB = {
             get: () => JSON.parse(localStorage.getItem('inpost_andon_v18')) || DB.init(),
